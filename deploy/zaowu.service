@@ -1,0 +1,27 @@
+[Unit]
+Description=Zaowu Engine API and generation worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=zaowu
+Group=zaowu
+WorkingDirectory=/opt/zaowu-engine/current/backend
+EnvironmentFile=/etc/zaowu-engine.env
+Environment=OPENBLAS_NUM_THREADS=1
+Environment=OMP_NUM_THREADS=1
+ExecStart=/opt/zaowu-engine/venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 18319 --workers 1
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/zaowu-engine
+MemoryHigh=900M
+MemoryMax=1400M
+TasksMax=128
+
+[Install]
+WantedBy=multi-user.target
