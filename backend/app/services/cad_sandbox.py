@@ -175,7 +175,10 @@ def build_script(script: str, out_dir: Path, timeout_s: int = 60) -> dict:
     if type(timeout_s) not in (int, float) or not 0 < timeout_s <= 120 or not math.isfinite(timeout_s):
         raise CadScriptError('CAD timeout must be positive and at most 120 seconds')
     validate_script(script)
-    with tempfile.TemporaryDirectory(prefix='zaowu-cad-') as temp_dir:
+    target = Path(out_dir)
+    target.mkdir(parents=True, exist_ok=True)
+    # Keep staging on the storage mount: PrivateTmp may be a different filesystem.
+    with tempfile.TemporaryDirectory(prefix='zaowu-cad-', dir=target) as temp_dir:
         worker = Path(__file__).with_name('cad_worker.py').resolve()
         process = subprocess.Popen([sys.executable, '-I', str(worker)], cwd=temp_dir,
                                    env=_child_environment(temp_dir), stdin=subprocess.PIPE,
@@ -208,8 +211,6 @@ def build_script(script: str, out_dir: Path, timeout_s: int = 60) -> dict:
             if 'error' in payload:
                 raise CadScriptError(payload['error'])
             exports = _validated_exports(Path(temp_dir))
-            target = Path(out_dir)
-            target.mkdir(parents=True, exist_ok=True)
             for suffix in ('stl', 'step'):
                 source = exports[suffix]
                 destination = target / source.name

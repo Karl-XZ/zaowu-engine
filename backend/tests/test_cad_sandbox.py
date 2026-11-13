@@ -50,6 +50,24 @@ result = cq.Workplane("XY").box(width, 30, 10).faces(">Z").workplane().hole(6)
     assert reimported.Volume() == pytest.approx(artifact['metrics']['volumeMm3'])
 
 
+def test_exports_when_system_temp_and_storage_are_different_mounts(tmp_path, monkeypatch):
+    import errno
+    from app.services import cad_sandbox
+    replace = cad_sandbox.os.replace
+
+    def rename_across_storage_boundary(source, destination):
+        # Simulate the EXDEV boundary created by systemd PrivateTmp/bind mounts.
+        if not Path(source).resolve().is_relative_to(tmp_path.resolve()):
+            raise OSError(errno.EXDEV, 'Invalid cross-device link')
+        return replace(source, destination)
+
+    monkeypatch.setattr(cad_sandbox.os, 'replace', rename_across_storage_boundary)
+    output = build_script('import cadquery as cq\nresult = cq.Workplane("XY").box(12,8,3)', tmp_path)
+    assert output['metrics']['volumeMm3'] == pytest.approx(288)
+    assert output['stl'].is_file() and output['step'].is_file()
+    assert sorted(p.name for p in tmp_path.iterdir()) == ['model.step', 'model.stl']
+
+
 @pytest.mark.parametrize('body', [
     'base = cq.Workplane("XY").box(60,70,4,centered=(True,True,False))\nback = cq.Workplane("XY").box(60,4,80).rotate((0,0,0),(1,0,0),20).translate((0,20,38))\nlip = cq.Workplane("XY").box(60,5,12).translate((0,-27,7))\nresult = base.union(back).union(lip)',
     'result = cq.Workplane("XY").polyline([(0,0),(60,0),(60,4),(4,4),(4,45),(0,45)]).close().extrude(25).edges("|Z").fillet(1)',
